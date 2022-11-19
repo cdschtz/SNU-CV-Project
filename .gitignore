@@ -1,3 +1,8 @@
+# START - CHRISTOPHER ADDITIONS
+.vscode/
+# END - CHRISTOPHER ADDITIONS
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
