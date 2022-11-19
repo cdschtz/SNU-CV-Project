@@ -1,4 +1,6 @@
-## Steps to replicate
+# Steps to replicate
+
+Link to detection models (and size comparison): <https://pytorch.org/vision/stable/models.html#object-detection>
 
 ### Create and activate a conda environment
 
@@ -24,4 +26,4 @@ pip install -r https://raw.githubusercontent.com/ultralytics/yolov5/master/requi
 
 You might need to install additional dependencies in order to run Jupyter notebooks.
 
-### Run the demo .ipynb file.
+### Run the demo .ipynb file
