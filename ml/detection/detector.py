@@ -4,17 +4,28 @@ from pathlib import Path
 import cv2
 import torch
 from torchvision.io.image import read_image
-from torchvision.models.detection import (FasterRCNN_ResNet50_FPN_V2_Weights,
-                                          fasterrcnn_resnet50_fpn_v2)
+from torchvision.models.detection import (
+    FasterRCNN_ResNet50_FPN_V2_Weights, SSDLite320_MobileNet_V3_Large_Weights,
+    fasterrcnn_resnet50_fpn_v2, ssdlite320_mobilenet_v3_large)
 from torchvision.transforms.functional import to_pil_image
 from torchvision.utils import draw_bounding_boxes
+from utils import MODEL_VARIANT
 
 
 class Detector:
-    def __init__(self, result_folder=None):
-        self.weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
-        self.model = fasterrcnn_resnet50_fpn_v2(
-            weights=self.weights, box_score_thresh=0.9)
+    def __init__(self, result_folder=None, model_variant: MODEL_VARIANT = MODEL_VARIANT.FASTER_RCNN):
+        if model_variant is MODEL_VARIANT.FASTER_RCNN:
+            self.weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+            self.model = fasterrcnn_resnet50_fpn_v2(
+                weights=self.weights, box_score_thresh=0.9)
+        elif model_variant is MODEL_VARIANT.SSD_LITE:
+            self.weights = SSDLite320_MobileNet_V3_Large_Weights.DEFAULT
+            self.model = ssdlite320_mobilenet_v3_large(
+                weights=self.weights, score_thresh=0.5)
+
+        assert self.weights is not None
+        assert self.model is not None
+
         self.model.eval()
 
         if result_folder is None:
