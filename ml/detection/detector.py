@@ -80,7 +80,9 @@ class Detector:
         self._load_video_images(video_file_path)
         self._preprocess_images()
 
+        assert self.batch is not None
         n = self.batch.shape[0]
+
         for i in range(0, n, batch_process_size):
             print("Iteration: ", i+1)
 
