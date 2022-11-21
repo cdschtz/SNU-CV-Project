@@ -36,15 +36,17 @@ class Detector:
         self.img_data_folder = None
 
     def _load_video_images(self, path):
-        vidcap = cv2.VideoCapture(path)
+        assert self.video_file_name is not None
 
+        vidcap = cv2.VideoCapture(path)
         success, image = vidcap.read()
         count = 0
 
         folder = "/".join(path.split("/")[:-1])  # Video folder path
-        os.system(f"rm -rf {folder}/images")  # Remove exisiting images
-        Path(f"{folder}/images").mkdir(parents=True, exist_ok=True)
-        self.img_data_folder = f"{folder}/images"
+        self.img_data_folder = f"{folder}/{self.video_file_name}"
+
+        os.system(f"rm -rf {self.img_data_folder}")  # Remove exisiting images
+        Path(f"{self.img_data_folder}").mkdir(parents=True, exist_ok=True)
 
         # For future reference:
         # Get number of necessary digits: (given no. of files)
@@ -66,25 +68,31 @@ class Detector:
 
         preprocess = self.weights.transforms()
 
-        for file in sorted(files):
+        for i, file in enumerate(sorted(files)):
+            print(f"Preprocessing image {i+1}.")
             img = read_image(str(file))
             img = preprocess(img)
             self.batch = torch.cat((self.batch, img.unsqueeze(0)), dim=0)
 
     def _save_results(self, img, idx):
-        Path(self.result_folder_images).mkdir(parents=True, exist_ok=True)
-        img.save(f"{self.result_folder_images}/frame{idx:06d}.jpg")
+        folder = Path(self.result_folder + "/" + self.video_file_name)
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        img.save(f"{folder}/frame{idx:06d}.jpg")
 
     def detect(self, video_file_path, save_file_name="output.mp4", batch_process_size=5):
-        print(f"Detecting with batch size of: {batch_process_size}")
+        self.video_file_name = video_file_path.split(
+            "/")[-1].split(".")[0]  # without extension
         self._load_video_images(video_file_path)
+
+        print("Start prepocessing")
         self._preprocess_images()
 
         assert self.batch is not None
         n = self.batch.shape[0]
 
+        print(f"Detecting with batch size of: {batch_process_size}")
         for i in range(0, n, batch_process_size):
-            print("Iteration: ", i+1)
+            print(f"Iteration: {i+1}/{n}")
 
             batch = self.batch[i:i + batch_process_size]
             predictions = self.model(batch)
@@ -104,3 +112,5 @@ class Detector:
 
                 im = to_pil_image(box.detach())
                 self._save_results(im, i+idx)
+
+        print("Done.")
