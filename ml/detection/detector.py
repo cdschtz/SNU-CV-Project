@@ -25,17 +25,19 @@ class Detector:
 
         assert self.weights is not None
         assert self.model is not None
+        print(f"Detector model: {model_variant}")
 
         self.model.eval()
 
         if result_folder is None:
             self.result_folder = "./ml/detection/results"
-            self.result_folder_images = self.result_folder + "/images"
 
         self.batch = None
         self.img_data_folder = None
+        self.num_frames = None
 
     def _load_video_images(self, path):
+        """Parses video file and saves all frames as images."""
         assert self.video_file_name is not None
 
         vidcap = cv2.VideoCapture(path)
@@ -59,58 +61,64 @@ class Detector:
             success, image = vidcap.read()
             count += 1
 
-    def _preprocess_images(self):
-        """Preprocess images for model inference."""
-        assert (self.img_data_folder != None)
-        self.batch = torch.tensor([], dtype=torch.float32)
+        self.num_frames = count
 
-        files = Path(self.img_data_folder).glob("*.jpg")
+    def _preprocess_images(self, files) -> torch.Tensor:
+        """Preprocess images for model inference."""
+        batch = torch.tensor([], dtype=torch.float32)
 
         preprocess = self.weights.transforms()
-
         for i, file in enumerate(sorted(files)):
-            print(f"Preprocessing image {i+1}.")
             img = read_image(str(file))
             img = preprocess(img)
-            self.batch = torch.cat((self.batch, img.unsqueeze(0)), dim=0)
+            batch = torch.cat((batch, img.unsqueeze(0)), dim=0)
+
+        return batch
 
     def _save_results(self, img, idx):
-        folder = Path(self.result_folder + "/" + self.video_file_name)
+        folder = Path(self.result_folder + "/" +
+                      self.video_file_name + "/" + self.model.__class__.__name__)
         Path(folder).mkdir(parents=True, exist_ok=True)
         img.save(f"{folder}/frame{idx:06d}.jpg")
 
-    def detect(self, video_file_path, save_file_name="output.mp4", batch_process_size=5):
+    def detect(self, video_file_path, batch_process_size=5):
         self.video_file_name = video_file_path.split(
             "/")[-1].split(".")[0]  # without extension
         self._load_video_images(video_file_path)
 
-        print("Start prepocessing")
-        self._preprocess_images()
-
-        assert self.batch is not None
-        n = self.batch.shape[0]
+        assert (self.img_data_folder != None)
+        assert (self.num_frames != None)
+        files = Path(self.img_data_folder).glob("*.jpg")
+        n = self.num_frames
 
         print(f"Detecting with batch size of: {batch_process_size}")
-        for i in range(0, n, batch_process_size):
-            print(f"Iteration: {i+1}/{n}")
+        batch_files = []
+        for i, file in enumerate(sorted(files)):
+            print(f"Iteration {i}/{n}")
+            batch_files.append(file)
 
-            batch = self.batch[i:i + batch_process_size]
-            predictions = self.model(batch)
+            if (i + 1) % batch_process_size == 0 or i == n - 1:
+                batch = self._preprocess_images(batch_files)
+                batch_files = []
 
-            for idx, prediction in enumerate(predictions):
-                labels = [self.weights.meta["categories"][i]
-                          for i in prediction["labels"]]
-                img = read_image(
-                    f"{self.img_data_folder}/frame{i+idx:06d}.jpg")
-                box = draw_bounding_boxes(
-                    img,
-                    boxes=prediction["boxes"],
-                    labels=labels,
-                    colors="red",
-                    width=4, font_size=30
-                )
+                predictions = self.model(batch)
 
-                im = to_pil_image(box.detach())
-                self._save_results(im, i+idx)
+                for idx, prediction in enumerate(predictions):
+                    dist = min(4, len(batch) - 1)
+
+                    labels = [self.weights.meta["categories"][i]
+                              for i in prediction["labels"]]
+                    img = read_image(
+                        f"{self.img_data_folder}/frame{i-dist+idx:06d}.jpg")
+                    box = draw_bounding_boxes(
+                        img,
+                        boxes=prediction["boxes"],
+                        labels=labels,
+                        colors="red",
+                        width=4, font_size=30
+                    )
+
+                    im = to_pil_image(box.detach())
+                    self._save_results(im, i-dist+idx)
 
         print("Done.")
