@@ -11,7 +11,9 @@ jobs:
       with:
         miniconda-version: "latest"
         activate-environment: snu-cv-project
-    - run: ls ml/detection
+    - name: Testing ls
+      run: |
+        ls -la
 #     - name: Bash
 #       shell: bash
 #       run: ls
