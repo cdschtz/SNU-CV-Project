@@ -22,7 +22,7 @@ Now, to run the detector model that generates the detections images and saves th
 python main.py <PATH_TO_VIDEO_FILE>
 ```
 
-where you replace <PATH_TO_VIDEO_FILE> by the path to the video file you want to run the detector on.
+where you replace <PATH_TO_VIDEO_FILE> by the path to the video file you want to run the detector on. An exemplary video can be found in the [data folder](./data/) folder
 
 This command by default will use the small and fast dector model ssd, if you want to use the more precise but slower fasterRCNN model you can append the `--model fasterRCNN` flag to the command:
 
