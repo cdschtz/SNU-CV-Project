@@ -13,5 +13,4 @@ jobs:
         activate-environment: snu-cv-project
     - name: Bash
       shell: bash
-      run: |
-        ls
+      run: ls
