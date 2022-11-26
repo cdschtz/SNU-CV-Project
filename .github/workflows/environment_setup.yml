@@ -3,7 +3,7 @@ name: Environment setup
 on: [push]
 
 jobs:
-  build-linux:
+  setup-linux-env:
     runs-on: ubuntu-latest
 
     steps:
@@ -11,9 +11,8 @@ jobs:
       with:
         miniconda-version: "latest"
         activate-environment: snu-cv-project
-    - name: Testing ls
+    - uses: actions/checkout@v2
+    - name: install python requirements
       run: |
         ls -la
-#     - name: Bash
-#       shell: bash
-#       run: ls
+        pip install -r ./ml/detection/requirements.txt
