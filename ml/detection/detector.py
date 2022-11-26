@@ -7,8 +7,9 @@ from torchvision.io.image import read_image
 from torchvision.models.detection import (
     FasterRCNN_ResNet50_FPN_V2_Weights, SSDLite320_MobileNet_V3_Large_Weights,
     fasterrcnn_resnet50_fpn_v2, ssdlite320_mobilenet_v3_large)
-from torchvision.transforms.functional import to_pil_image
-from torchvision.utils import draw_bounding_boxes
+from torchvision.transforms.functional import to_pil_image, to_tensor
+from torchvision.utils import draw_bounding_boxes, draw_keypoints
+from tqdm import tqdm
 from utils import MODEL_VARIANT
 
 
@@ -75,13 +76,27 @@ class Detector:
 
         return batch
 
-    def _save_results(self, img, idx):
+    def _save_image_results(self, img, idx):
         folder = Path(self.result_folder + "/" +
                       self.video_file_name + "/" + self.model.__class__.__name__)
         Path(folder).mkdir(parents=True, exist_ok=True)
         img.save(f"{folder}/frame{idx:06d}.jpg")
 
+    def _serialize_detections(self, detections):
+        """Serialize detections to .txt file."""
+        folder = Path(self.result_folder + "/" +
+                      self.video_file_name + "/" +
+                      self.model.__class__.__name__ + "_detections")
+        Path(folder).mkdir(parents=True, exist_ok=True)
+
+        with open(f"{folder}/detections.txt", "w") as f:
+            for detection in detections:
+                f.write(",".join(map(lambda x: str(x), list(detection.values()))))
+                f.write("\n")
+            f.close()
+
     def detect(self, video_file_path, batch_process_size=5):
+        print(f"Starting detection with batch size of: {batch_process_size}")
         self.video_file_name = video_file_path.split(
             "/")[-1].split(".")[0]  # without extension
         self._load_video_images(video_file_path)
@@ -91,10 +106,10 @@ class Detector:
         files = Path(self.img_data_folder).glob("*.jpg")
         n = self.num_frames
 
-        print(f"Detecting with batch size of: {batch_process_size}")
+        all_detections = []
+
         batch_files = []
-        for i, file in enumerate(sorted(files)):
-            print(f"Iteration {i}/{n}")
+        for i, file in enumerate(tqdm(sorted(files))):
             batch_files.append(file)
 
             if (i + 1) % batch_process_size == 0 or i == n - 1:
@@ -110,6 +125,23 @@ class Detector:
                               for i in prediction["labels"]]
                     img = read_image(
                         f"{self.img_data_folder}/frame{i-dist+idx:06d}.jpg")
+
+                    detection = {}
+                    for score, box in zip(prediction["scores"], prediction["boxes"]):
+                        detection["frameNumber"] = i-dist+idx
+                        detection["objectId"] = -1
+
+                        # top-left corner
+                        detection["x0"] = round(box[0].item(), 2)
+                        detection["y0"] = round(box[1].item(), 2)
+
+                        # bottom-right corner
+                        detection["x1"] = round(box[2].item(), 2)
+                        detection["y1"] = round(box[3].item(), 2)
+
+                        detection["confidenceScore"] = round(score.item(), 2)
+                        all_detections.append(detection)
+
                     box = draw_bounding_boxes(
                         img,
                         boxes=prediction["boxes"],
@@ -119,6 +151,7 @@ class Detector:
                     )
 
                     im = to_pil_image(box.detach())
-                    self._save_results(im, i-dist+idx)
 
-        print("Done.")
+                    self._save_image_results(im, i-dist+idx)
+
+        self._serialize_detections(all_detections)
