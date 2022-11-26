@@ -12,7 +12,8 @@ jobs:
         miniconda-version: "latest"
         activate-environment: snu-cv-project
     - uses: actions/checkout@v2
-    - name: install python requirements
+    - name: Python Requirements and Detector
       run: |
         ls -la
         pip install -r ./ml/detection/requirements.txt
+        python ./ml/detection/main.py ./ml/detection/data/action_video_test.mov
