@@ -3,7 +3,7 @@ name: Environment setup
 on: [push]
 
 jobs:
-  build-linux:
+  setup-linux-env:
     runs-on: ubuntu-latest
 
     steps:
@@ -11,9 +11,8 @@ jobs:
       with:
         miniconda-version: "latest"
         activate-environment: snu-cv-project
-    - name: Bash
-      shell: bash
+    - uses: actions/checkout@v2
+    - name: Python Requirements and Detector
       run: |
-        ls
         pip install -r ./ml/detection/requirements.txt
-        python ml/detection/main.py /Users/chris/dev/SNU-CV-Project/ml/detection/data/action_video_test.mov
+        python ./ml/detection/main.py ./ml/detection/data/action_video_test.mov
