@@ -14,4 +14,5 @@ jobs:
     - name: Bash
       shell: bash
       run: |
-        conda info
+        pip install -r ./ml/detection/requirements.txt
+        python ml/detection/main.py /Users/chris/dev/SNU-CV-Project/ml/detection/data/action_video_test.mov
