@@ -16,7 +16,7 @@ conda activate snu-cv-project
 pip install -r ./ml/detection/requirements.txt
 ```
 
-Now, to run the detector model that generates the detections images and saves them in the results folder, use the following command (with the activatet conda environment):
+Now, to run the detector model that generates the detections images and saves them in the results folder, use the following command (with the activated conda environment):
 
 ```bash
 python ./ml/detection/main.py <PATH_TO_VIDEO_FILE>
@@ -30,7 +30,7 @@ To run it on the test video you can use:
 python ./ml/detection/main.py .ml/detection/data/test_short_video.mov
 ```
 
-This command by default will use the small and fast dector model ssd, if you want to use the more precise but slower fasterRCNN model you can append the `--model fasterRCNN` flag to the command:
+This command by default will use the small and fast dector model ssd, if you want to use the more precise but slower fasterRCNN model you can append the `--model faster_rcnn` flag to the command:
 
 ```bash
 python ./ml/detection/main.py <PATH_TO_VIDEO_FILE> --model faster_rcnn
