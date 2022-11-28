@@ -126,8 +126,8 @@ class Detector:
                     img = read_image(
                         f"{self.img_data_folder}/frame{i-dist+idx:06d}.jpg")
 
-                    detection = {}
                     for score, box in zip(prediction["scores"], prediction["boxes"]):
+                        detection = {}
                         detection["frameNumber"] = i-dist+idx
                         detection["objectId"] = -1
 
