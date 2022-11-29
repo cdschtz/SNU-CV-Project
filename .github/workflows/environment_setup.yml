@@ -16,3 +16,17 @@ jobs:
       run: |
         pip install -r ./ml/detection/requirements.txt
         python ./ml/detection/main.py ./ml/detection/data/action_video_test.mov
+
+  setup-windows-env:
+    runs-on: windows-latest
+
+    steps:
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniconda-version: "latest"
+        activate-environment: snu-cv-project
+    - uses: actions/checkout@v2
+    - name: Python Requirements and Detector
+      run: |
+        pip install -r ./ml/detection/requirements.txt
+        python ./ml/detection/main.py ./ml/detection/data/action_video_test.mov
