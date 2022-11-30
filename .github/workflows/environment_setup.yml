@@ -1,6 +1,9 @@
 name: Environment setup
 
-on: [push]
+on: 
+  push:
+    paths:
+      - trackers/**
 
 jobs:
   setup-linux-env:
@@ -14,8 +17,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Python Requirements and Detector
       run: |
-        pip install -r ./ml/detection/requirements.txt
-        python ./ml/detection/main.py ./ml/detection/data/action_video_test.mov
+        pip install -r ./trackers/algorithmic_tracker_by_detection/requirements.txt
+        python ./trackers/algorithmic_tracker_by_detection/main.py ./data/action_video_test.mov
 
   setup-windows-env:
     runs-on: windows-latest
@@ -28,5 +31,5 @@ jobs:
     - uses: actions/checkout@v2
     - name: Python Requirements and Detector
       run: |
-        pip install -r ./ml/detection/requirements.txt
-        python ./ml/detection/main.py ./ml/detection/data/action_video_test.mov
+        pip install -r ./trackers/algorithmic_tracker_by_detection/requirements.txt
+        python ./trackers/algorithmic_tracker_by_detection/main.py ./data/action_video_test.mov

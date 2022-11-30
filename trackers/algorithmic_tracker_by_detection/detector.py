@@ -68,7 +68,10 @@ class Detector:
         """Preprocess images for model inference."""
         batch = torch.tensor([], dtype=torch.float32)
 
-        preprocess = self.weights.transforms()
+        preprocess = self.weights.transforms()  
+        # TODO: Investigate what this function does exactly
+
+        
         for i, file in enumerate(sorted(files)):
             img = read_image(str(file))
             img = preprocess(img)

@@ -1,6 +1,8 @@
 # START - CHRISTOPHER ADDITIONS
 .vscode/
 .scripts/
+data/*
+!data/action_video_test.mov
 *testing.ipynb
 # END - CHRISTOPHER ADDITIONS
 
