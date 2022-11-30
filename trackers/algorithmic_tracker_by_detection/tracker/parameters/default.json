@@ -1,0 +1,6 @@
+{
+  "searchRadius": 50,
+  "minAge": 50,
+  "maxTrackGap": 30,
+  "minImageSpaceDistance": 200.0
+}
