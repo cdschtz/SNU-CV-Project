@@ -3,4 +3,7 @@
 ### Directory Structure
 
 * [frontend](frontend): Client-side code (React.js)
-* [ml](ml): Contains machine learning (deep learning) related code, such as object detection models.
+* [trackers](trackers): Contains tracker related code, separated by the tracking algorithm.
+  * Primitive Lucas Kanade Tracking
+  * Naive (Algorithmic) tracking with inputs of a deep detection model
+  * Deep End-To-End Tracking (to come...)
