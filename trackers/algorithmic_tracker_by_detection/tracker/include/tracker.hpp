@@ -76,6 +76,7 @@ public:
     this->dataIdentifier = inputPath.stem();
     this->ReadParameters(parameterFile);
     this->ReadDetections();
+    this->DeclutterDetections();
     this->SetupResultsDirectory();
   }
 
@@ -287,6 +288,44 @@ private:
     this->detections = utils::ReadDetections(detectionsFile);
   }
 
+  void DeclutterDetections() {
+    std::vector<utils::Detection> declutteredDetections;
+    int previousFrameNumber = 0;
+    int j = 0;
+    for (int i = 0; i < this->detections.size(); i++) {
+      int distanceToLastFrame = this->detections[i].frameNumber - previousFrameNumber;
+      if (distanceToLastFrame > 0) {
+        auto frameDetectionsToKeep = std::vector<utils::Detection>();
+        for (int k = j; k < i; k++) {
+          for (int l = k; l < i; l++) {
+            if (k != l) {
+              // remove detections that are too close to each other
+              std::tuple<double, double> point = std::make_tuple(
+                detections[k].x0 + (detections[k].x1 - detections[k].x0) / 2.,
+                detections[k].y0 + (detections[k].y1 - detections[k].y0) / 2.
+              );
+              std::tuple<double, double> point2 = std::make_tuple(
+                detections[l].x0 + (detections[l].x1 - detections[l].x0) / 2.,
+                detections[l].y0 + (detections[l].y1 - detections[l].y0) / 2.
+              );
+              double distance = utils::GetEuclidDistance(point, point2);
+              if (distance < 30.) {
+                break;
+              }
+              if (l == i - 1) {
+                frameDetectionsToKeep.push_back(detections[k]);
+              }
+            }
+          }
+        }
+        previousFrameNumber = this->detections[i].frameNumber;
+        j = i;
+
+        declutteredDetections.insert(declutteredDetections.end(), frameDetectionsToKeep.begin(), frameDetectionsToKeep.end());
+      }
+    }
+    this->detections = declutteredDetections;
+  }
 
   void GetImageDimensionsAndFrameCount() {
     // Frame Count
