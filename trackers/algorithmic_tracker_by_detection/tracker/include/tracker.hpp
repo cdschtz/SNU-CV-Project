@@ -7,10 +7,19 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/videoio.hpp>  // Video write
+#include <filesystem>
+#include <nlohmann/json.hpp>
 
 #include "utils.hpp"
 
+namespace fs = std::filesystem;
+using json = nlohmann::json;
+
 namespace tracker {
+
+std::string VIDEO_OUTPUT_STEM = "video";
+std::string IMAGE_OUTPUT_STEM = "images";
+std::string TRACKS_OUTPUT_STEM = "tracks";
 
 struct Track {
   Track(int startFrame) : startFrame(startFrame) {
@@ -61,23 +70,25 @@ struct TrackerParameters {
 class Tracker {
 public:
   TrackerParameters parameters;
-  Tracker(TrackerParameters parameters) {
-    this->parameters = parameters;
+  Tracker(fs::path inputPath, fs::path parameterFile) {
+    this->inputPath = inputPath;
+    this->GetImageDimensionsAndFrameCount();
+    this->dataIdentifier = inputPath.stem();
+    this->ReadParameters(parameterFile);
+    this->ReadDetections();
+    this->SetupResultsDirectory();
   }
 
-  std::vector<Track> CreateTrackingLines(std::vector<utils::Detection> detections) {
+  void CreateTrackingLines() {
     auto tracks = std::vector<Track>();
     int previousFrame = 0;
-    this->numDetections = detections.back().frameNumber; // TODO: Innacurate
 
-    for (auto& detection : detections) {
-      // std::cout << "New detection starting" << std::endl;
+    for (auto& detection : this->detections) {
       bool detectionWasInserted = false;
       auto currentFrame = detection.frameNumber;
       auto distanceToLastFrame = currentFrame - previousFrame;
 
       if (distanceToLastFrame > 0) {
-        // std::cout << "Current frame: " << currentFrame << std::endl;
         for (auto& track : tracks) {
           if (!track.newInsertion) {
             track.gap += distanceToLastFrame;
@@ -137,7 +148,7 @@ public:
     for (std::vector<Track>::iterator it = tracks.begin(); it!=tracks.end();) {
       // Set unfinished tracks' last frame to the last detection frame
       if (it->endFrame == -1) {
-        it->endFrame = this->numDetections;
+        it->endFrame = this->detections.back().frameNumber;
       }
 
       // Remove tracks not long enough (geometrically and temporally)
@@ -151,25 +162,18 @@ public:
     }
 
     std::cout << "Number of tracks after deletion: " << tracks.size() << std::endl;
-    return tracks;
+    this->tracks = tracks;
   }
 
-  void VisualizeTracks(
-    std::vector<Track> tracks,
-    std::string inputImageDirectoryPath,
-    std::string outputDirectoryPath,
-    std::string outputVideoFileName) {
-    
-    // get size of image for video output config
-    std::string imageFileName = inputImageDirectoryPath + "/frame000000.jpg";
-    std::string image_path = cv::samples::findFile(imageFileName);
-    cv::Mat src = cv::imread(image_path, cv::IMREAD_COLOR);
-    cv::Size S = src.size();
-
-    // Video start
+  void VisualizeTracks() {
     cv::VideoWriter outputVideo;
     auto EXT = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
-    outputVideo.open(outputVideoFileName, EXT, 60, S, true);
+    fs::path videoFile = this->resultsDirectory / this->dataIdentifier / VIDEO_OUTPUT_STEM / "output.avi";
+    if (fs::exists(videoFile)) {
+      fs::remove(videoFile);
+    }
+
+    outputVideo.open(videoFile, EXT, 60, this->imageSize, true);
     if (!outputVideo.isOpened())
     {
         std::cout  << "Could not open the output video for write: " << std::endl;
@@ -184,12 +188,14 @@ public:
     }
     std::map<int, std::vector<cv::KeyPoint>> pointsMap;  // index to track points
 
-    for (int i = 0; i < this->numDetections; i++) {
+    for (int i = 0; i < this->numFrames; i++) {
       int num_zeros = num_digits - ceil(log10(i+1));
       if (num_zeros == 6) {
         num_zeros = 5; // only necessary for the first element
       }
-      std::string imageFileName = inputImageDirectoryPath + "/frame" + std::string(num_zeros, '0') + std::to_string(i) + ".jpg";
+
+      fs::path imagePath = this->inputPath / IMAGE_OUTPUT_STEM;
+      fs::path imageFileName = imagePath / ("frame" + std::string(num_zeros, '0') + std::to_string(i) + ".jpg");
       std::string image_path = cv::samples::findFile(imageFileName);
       cv::Mat img = cv::imread(image_path, cv::IMREAD_COLOR);
 
@@ -214,7 +220,8 @@ public:
         cv::drawKeypoints(img, pointsMap[i], img, colorMap[i], cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
       }
 
-      std::string outputFileName = outputDirectoryPath + "/frame" + std::string(num_zeros, '0') + std::to_string(i) + ".jpg";
+      fs::path outputImagePath = this->resultsDirectory / this->dataIdentifier / IMAGE_OUTPUT_STEM;
+      fs::path outputFileName = outputImagePath / ("frame" + std::string(num_zeros, '0') + std::to_string(i) + ".jpg");
       cv::imwrite(outputFileName, img);
 
       // Video write
@@ -225,7 +232,80 @@ public:
     outputVideo.release();
   }
 private:
-  int numDetections;
+  int numFrames;
+
+  cv::Size imageSize;
+
+  fs::path inputPath;
+  fs::path resultsDirectory;
+  std::string dataIdentifier;
+
+  std::vector<utils::Detection> detections;
+  std::vector<Track> tracks;
+
+  void SetupResultsDirectory() {
+    fs::path resultsDirectory = fs::current_path() / "trackers" / "algorithmic_tracker_by_detection" / "results";
+    if (!fs::exists(resultsDirectory)) {
+      fs::create_directory(resultsDirectory);
+    }
+    this->resultsDirectory = resultsDirectory;
+
+    // file dependent identifier
+    if (!fs::exists(resultsDirectory / dataIdentifier)) {
+      fs::create_directory(resultsDirectory / dataIdentifier);
+      fs::create_directory(resultsDirectory / dataIdentifier / "tracks");
+      fs::create_directory(resultsDirectory / dataIdentifier / "images");
+      fs::create_directory(resultsDirectory / dataIdentifier / VIDEO_OUTPUT_STEM);
+    } else {
+      fs::path previousResultsPath = resultsDirectory / dataIdentifier;
+      fs::remove_all(previousResultsPath);
+    }
+  }
+
+  void ReadParameters(std::string parameterFile) {
+    // Parse tracker parameters
+    std::ifstream f(parameterFile);
+    json jsonParameters = json::parse(f);
+    tracker::TrackerParameters parameters {
+      jsonParameters["searchRadius"].get<int>(),
+      jsonParameters["minAge"].get<int>(),
+      jsonParameters["maxTrackGap"].get<int>(),
+      jsonParameters["minImageSpaceDistance"].get<double>(),
+    };
+
+    std::cout << "Initialized tracker with parameters:" << "\n";
+    std::cout << "Search Radius: " << parameters.searchRadius << "\n";
+    std::cout << "Min Age: " << parameters.minAge << "\n";
+    std::cout << "Max Track Gap: " << parameters.maxTrackGap << "\n";
+    std::cout << "Min Image Space Distance: " << parameters.minImageSpaceDistance << "\n";
+
+    this->parameters = parameters;
+  }
+
+  void ReadDetections() {
+    fs::path detectionsFile = this->inputPath / "detections" / "detections.txt";
+    this->detections = utils::ReadDetections(detectionsFile);
+  }
+
+
+  void GetImageDimensionsAndFrameCount() {
+    // Frame Count
+    fs::path imagesDirectory = this->inputPath / "images";
+    int numFrames = 0;
+    for (auto& p : fs::directory_iterator(imagesDirectory)) {
+      numFrames++;
+    }
+    this->numFrames = numFrames;
+
+    // Image Dimensions
+    fs::path imagePath = this->inputPath / "images" / "frame000000.jpg";
+    if (!fs::exists(imagePath)) {
+      std::cout << "Image does not exist: " << imagePath << std::endl;
+      return;
+    }
+    cv::Mat img = cv::imread(imagePath, cv::IMREAD_COLOR);
+    this->imageSize = img.size();  // necessary for video creation
+  }
 };
 
 }
