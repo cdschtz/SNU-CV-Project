@@ -10,12 +10,15 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
+#include "config.h"
 #include "utils.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 namespace tracker {
+
+std::string SOURCE_DIRECTORY = SOURCE_DIR;
 
 std::string VIDEO_OUTPUT_STEM = "video";
 std::string IMAGE_OUTPUT_STEM = "images";
@@ -110,7 +113,7 @@ public:
       for (auto& track : tracks) {
         if (track.gap <= parameters.maxTrackGap
           && !(track.newInsertion)
-          && utils::GetEuclidDistance(
+          && utils::GetEuclidDistance<double>(
             track.centerPositions.back(), 
             detectionCenterPosition) <= parameters.searchRadius
           && track.endFrame == -1) {
@@ -154,7 +157,7 @@ public:
 
       // Remove tracks not long enough (geometrically and temporally)
       if(it->centerPositions.size() < parameters.minAge
-        || utils::GetEuclidDistance(it->centerPositions.front(), it->centerPositions.back())
+        || utils::GetEuclidDistance<double>(it->centerPositions.front(), it->centerPositions.back())
         < parameters.minImageSpaceDistance) {
         it = tracks.erase(it);
       } else {
@@ -245,7 +248,7 @@ private:
   std::vector<Track> tracks;
 
   void SetupResultsDirectory() {
-    fs::path resultsDirectory = fs::current_path() / "trackers" / "algorithmic_tracker_by_detection" / "results";
+    fs::path resultsDirectory = fs::path(SOURCE_DIRECTORY) / "results";
     if (!fs::exists(resultsDirectory)) {
       fs::create_directory(resultsDirectory);
     }
@@ -308,7 +311,7 @@ private:
                 detections[l].x0 + (detections[l].x1 - detections[l].x0) / 2.,
                 detections[l].y0 + (detections[l].y1 - detections[l].y0) / 2.
               );
-              double distance = utils::GetEuclidDistance(point, point2);
+              double distance = utils::GetEuclidDistance<double>(point, point2);
               if (distance < 30.) {
                 break;
               }

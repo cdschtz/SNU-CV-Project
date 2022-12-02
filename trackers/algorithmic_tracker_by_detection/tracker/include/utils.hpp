@@ -7,14 +7,14 @@ namespace utils {
 
 cv::Scalar GetRandomColor() {
   cv::Scalar color(
-    (double)std::rand() / RAND_MAX * 255,
-    (double)std::rand() / RAND_MAX * 255,
-    (double)std::rand() / RAND_MAX * 255
+    (double) std::rand() / RAND_MAX * 255,
+    (double) std::rand() / RAND_MAX * 255,
+    (double) std::rand() / RAND_MAX * 255
   );
   return color;
 }
 
-double GetEuclidDistance(std::tuple<double, double> a, std::tuple<double, double> b) {
+template <typename T> T GetEuclidDistance(std::tuple<T, T> a, std::tuple<T, T> b) {
   double tmp = pow((std::get<0>(a) - std::get<0>(b)), 2) + pow((std::get<1>(a) - std::get<1>(b)), 2);
   return sqrt(tmp);
 }
