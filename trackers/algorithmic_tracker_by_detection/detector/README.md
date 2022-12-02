@@ -1,3 +1,4 @@
+
 # Steps to replicate
 
 Link to detection models (and size comparison): <https://pytorch.org/vision/stable/models.html#object-detection>
