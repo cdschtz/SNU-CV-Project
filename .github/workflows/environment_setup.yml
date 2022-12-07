@@ -17,8 +17,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Python Requirements and Detector
       run: |
-        pip install -r ./trackers/algorithmic_tracker_by_detection/requirements.txt
-        python ./trackers/algorithmic_tracker_by_detection/main.py ./data/action_video_test.mov
+        pip install -r ./trackers/algorithmic_tracker_by_detection/detector/requirements.txt
+        python ./trackers/algorithmic_tracker_by_detection/detector/main.py ./data/action_video_test.mov
 
   setup-windows-env:
     runs-on: windows-latest
@@ -31,5 +31,5 @@ jobs:
     - uses: actions/checkout@v2
     - name: Python Requirements and Detector
       run: |
-        pip install -r ./trackers/algorithmic_tracker_by_detection/requirements.txt
-        python ./trackers/algorithmic_tracker_by_detection/main.py ./data/action_video_test.mov
+        pip install -r ./trackers/algorithmic_tracker_by_detection/detector/requirements.txt
+        python ./trackers/algorithmic_tracker_by_detection/detector/main.py ./data/action_video_test.mov
