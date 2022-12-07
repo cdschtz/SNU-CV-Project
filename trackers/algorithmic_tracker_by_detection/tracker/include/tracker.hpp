@@ -208,7 +208,8 @@ public:
     this->tracks = tracks;
   }
 
-  void VisualizeTracks() {
+  // Reduce clutter by only showing the tracks from the last x frames
+  void VisualizeTracks(int fps = 30) {
     cv::VideoWriter outputVideo;
     auto EXT = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
     fs::path videoFile = this->resultsDirectory / this->dataIdentifier / VIDEO_OUTPUT_STEM / "output.avi";
@@ -216,7 +217,7 @@ public:
       fs::remove(videoFile);
     }
 
-    outputVideo.open(videoFile, EXT, 60, this->imageSize, true);
+    outputVideo.open(videoFile, EXT, fps, this->imageSize, true);
     if (!outputVideo.isOpened())
     {
         std::cout  << "Could not open the output video for write: " << std::endl;
@@ -253,14 +254,17 @@ public:
           if (track.centerPositions.size() > i - track.startFrame) {
             auto point = std::get<0>(track.centerPositions[i - track.startFrame]);
             auto point2 = std::get<1>(track.centerPositions[i - track.startFrame]);
-            pointsMap[trackIndex].push_back(cv::KeyPoint(point, point2, 10));
+            pointsMap[trackIndex].push_back(cv::KeyPoint(point, point2, 3));
           }
         }
         trackIndex++;
       }
 
-      for (int i = 0; i < tracks.size(); i++) {
-        cv::drawKeypoints(img, pointsMap[i], img, colorMap[i], cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+      for (int j = 0; j < tracks.size(); j++) {
+        // only draw currently relevant tracks
+        if (tracks[j].startFrame <= i && tracks[j].endFrame >= i) {
+          cv::drawKeypoints(img, pointsMap[j], img, colorMap[j], cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        }
       }
 
       fs::path outputImagePath = this->resultsDirectory / this->dataIdentifier / IMAGE_OUTPUT_STEM;
@@ -283,7 +287,7 @@ private:
   fs::path resultsDirectory;
   std::string dataIdentifier;
 
-  std::vector<utils::Detection> detections;
+  std::map<int, std::vector<utils::Detection>> detections;
   std::vector<Track> tracks;
 
   void SetupResultsDirectory() {
@@ -348,6 +352,20 @@ private:
     cv::Mat img = cv::imread(imagePath, cv::IMREAD_COLOR);
     this->imageSize = img.size();  // necessary for video creation
   }
+
+  bool IsInBlockedRegion(
+    std::vector<std::tuple<double, double>> blockedRegions,
+    std::tuple<double, double> point) {
+
+    for (auto blockedRegion : blockedRegions) {
+      if (utils::GetEuclidDistance(blockedRegion, point) <= this->parameters.searchRadius) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
 };
 
 }
