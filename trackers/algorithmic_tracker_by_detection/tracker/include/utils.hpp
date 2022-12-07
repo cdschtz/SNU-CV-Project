@@ -1,3 +1,4 @@
+#include <map>
 #include <vector>
 #include <cmath>
 #include <cstdlib>
@@ -5,6 +6,22 @@
 #include <opencv2/opencv.hpp>
 
 namespace utils {
+
+std::tuple<double, double> TOP_LEFT_CORNER = std::make_tuple(590., 225.);
+std::tuple<double, double> BOTTOM_RIGHT_CORNER = std::make_tuple(1084., 485.);
+
+bool IsInSearchArea(std::tuple<double, double> detectionCenter) {
+  double xCoord = std::get<0>(detectionCenter);
+  double yCoord = std::get<1>(detectionCenter);
+  if (xCoord < std::get<0>(TOP_LEFT_CORNER)
+      || xCoord > std::get<0>(BOTTOM_RIGHT_CORNER)
+      || yCoord < std::get<1>(TOP_LEFT_CORNER)
+      || yCoord > std::get<1>(BOTTOM_RIGHT_CORNER)
+  ) {
+    return false;
+  }
+  return true;
+}
 
 cv::Scalar GetRandomColor() {
   cv::Scalar color(
@@ -53,7 +70,7 @@ Detection ParseDetectionFromString(std::string detectionString)
   return detection;
 }
 
-std::vector<Detection> ReadDetections(std::string fileName)
+std::map<int, std::vector<Detection>> ReadDetections(std::string fileName)
 {
   std::ifstream ifs; // input file stream
   std::string str;
@@ -62,7 +79,9 @@ std::vector<Detection> ReadDetections(std::string fileName)
     std::ios::in
   ); // input file stream
 
-  std::vector<Detection> detections = std::vector<Detection>();
+  auto detections = std::map<int, std::vector<Detection>>();
+  std::vector<Detection> currentFrameDetections = std::vector<Detection>();
+  int previousFrame = 0;
   
   if(ifs)
   {
@@ -75,7 +94,12 @@ std::vector<Detection> ReadDetections(std::string fileName)
       }
       
       Detection detection = ParseDetectionFromString(str);
-      detections.insert(detections.end(), detection);
+      if ((detection.frameNumber - previousFrame) > 0) {
+        detections.insert({previousFrame, currentFrameDetections});
+        currentFrameDetections.clear();
+        previousFrame = detection.frameNumber;
+      }
+      currentFrameDetections.insert(currentFrameDetections.end(), detection);
     }
 
     ifs.close();

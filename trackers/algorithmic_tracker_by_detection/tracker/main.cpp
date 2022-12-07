@@ -11,18 +11,19 @@ int main(int argc, char **argv) {
   std::cout << "\n";
   std::string inputPath = argv[1];
   std::string parameterFile = argv[2];
-  std::cout << "Program argument read in successfully!" << "\n";
+  std::cout << "Data file:\n" << inputPath << "\n\n";
+  std::cout << "Parameter file:\n" << parameterFile << "\n\n";
 
   // Initialize tracker
   tracker::Tracker tracker = tracker::Tracker(inputPath, parameterFile);
 
   // Create tracks
-  std::cout << "Being creating tracks..." << "\n";
+  std::cout << "Begin creating tracks..." << "\n";
   tracker.CreateTrackingLines();
 
   // Visualization
   std::cout << "Begin visualization:" << "\n";
-  tracker.VisualizeTracks();
+  tracker.VisualizeTracks(30);
 
   // End
   std::cout << "Done." << std::endl;

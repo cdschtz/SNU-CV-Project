@@ -1,14 +1,13 @@
+#include <string>
 #include <vector>
 #include <iostream>
-#include <string>
-#include <map>
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/core/types.hpp>
-#include <opencv2/features2d.hpp>
-#include <opencv2/videoio.hpp>  // Video write
 #include <filesystem>
+#include <opencv2/core.hpp>
 #include <nlohmann/json.hpp>
+#include <opencv2/videoio.hpp>  // Video write
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/features2d.hpp>
+#include <opencv2/core/types.hpp>
 
 #include "config.h"
 #include "utils.hpp"
@@ -79,7 +78,6 @@ public:
     this->dataIdentifier = inputPath.stem();
     this->ReadParameters(parameterFile);
     this->ReadDetections();
-    this->DeclutterDetections();
     this->SetupResultsDirectory();
   }
 
@@ -87,72 +85,113 @@ public:
     auto tracks = std::vector<Track>();
     int previousFrame = 0;
 
-    for (auto& detection : this->detections) {
-      bool detectionWasInserted = false;
-      auto currentFrame = detection.frameNumber;
-      auto distanceToLastFrame = currentFrame - previousFrame;
+    for (auto const& [frameNumber, detections] : this->detections) {
+      auto distanceToLastFrame = frameNumber - previousFrame;
 
-      if (distanceToLastFrame > 0) {
-        for (auto& track : tracks) {
-          if (!track.newInsertion) {
-            track.gap += distanceToLastFrame;
-            if (track.gap > parameters.maxTrackGap) {
-              track.endFrame = currentFrame;
-            }
-          }
-
-          track.newInsertion = false;
-        }
-      }
-
-      std::tuple<double, double> detectionCenterPosition = std::make_tuple(
-          detection.x0 + (detection.x1 - detection.x0) / 2.,
-          detection.y0 + (detection.y1 - detection.y0) / 2.
-      );
+      auto currentBlockedRegions = std::vector<std::tuple<double, double>>();
 
       for (auto& track : tracks) {
-        if (track.gap <= parameters.maxTrackGap
-          && !(track.newInsertion)
-          && utils::GetEuclidDistance<double>(
-            track.centerPositions.back(), 
-            detectionCenterPosition) <= parameters.searchRadius
-          && track.endFrame == -1) {
-            if (track.gap > 0) {
-              auto interpolatedPositions = GetInterpolatedPositions(
-                track.centerPositions.back(), 
-                detectionCenterPosition, 
-                track.gap
-              );
-              track.centerPositions.insert(
-                track.centerPositions.end(), 
-                interpolatedPositions.begin(), 
-                interpolatedPositions.end()
-              );
-            }
+        auto candidates = std::map<int, double>();
 
-            track.centerPositions.push_back(detectionCenterPosition);
-            track.newInsertion = true;
-            detectionWasInserted = true;
-            track.gap = 0;
+        for (int i=0; i < detections.size(); i++) {
+          std::tuple<double, double> detectionCenterPosition = std::make_tuple(
+              detections[i].x0 + (detections[i].x1 - detections[i].x0) / 2.,
+              detections[i].y0 + (detections[i].y1 - detections[i].y0) / 2.
+          );
+
+          if (track.gap <= parameters.maxTrackGap
+                && !(track.newInsertion)
+                && utils::GetEuclidDistance<double>
+                  (track.centerPositions.back(), detectionCenterPosition)
+                   <= parameters.searchRadius
+                && track.endFrame == -1
+                && utils::IsInSearchArea(detectionCenterPosition)
+                && !this->IsInBlockedRegion(currentBlockedRegions, detectionCenterPosition)) {
+            auto distance = utils::GetEuclidDistance<double>(
+              track.centerPositions.back(), detectionCenterPosition);
+            candidates.insert({i, distance});
           }
+        }
+
+        // If no matches for track, skip
+        if (candidates.empty()) {
+          continue;
+        }
+
+        // Get best detection match
+        auto bestCandidate = *min_element(candidates.begin(), candidates.end(),
+            [](const auto& l, const auto& r) { return l.second < r.second; });
+        std::tuple<double, double> detectionCenterPosition = std::make_tuple(
+            detections[bestCandidate.first].x0 + (detections[bestCandidate.first].x1 - detections[bestCandidate.first].x0) / 2.,
+            detections[bestCandidate.first].y0 + (detections[bestCandidate.first].y1 - detections[bestCandidate.first].y0) / 2.
+        );
+
+        // block search space around detectionCenterPosition
+        currentBlockedRegions.push_back(detectionCenterPosition);
+
+        // Interpolate positions if track is large
+        if (track.gap > 0) {
+          auto interpolatedPositions = GetInterpolatedPositions(
+            track.centerPositions.back(), 
+            detectionCenterPosition, 
+            track.gap
+          );
+          track.centerPositions.insert(
+            track.centerPositions.end(), 
+            interpolatedPositions.begin(), 
+            interpolatedPositions.end()
+          );
+        }
+
+        track.centerPositions.push_back(detectionCenterPosition);
+        track.newInsertion = true;
+        track.gap = 0;
       }
 
-      if (!detectionWasInserted) {
-        auto newTrack = Track(currentFrame);
+      // update to for loop over remaining detections
+      for (auto& detection : detections) {
+        std::tuple<double, double> detectionCenterPosition = std::make_tuple(
+            detection.x0 + (detection.x1 - detection.x0) / 2.,
+            detection.y0 + (detection.y1 - detection.y0) / 2.
+        );
+
+        for (auto& blockedRegion : currentBlockedRegions) {
+          if (utils::GetEuclidDistance(detectionCenterPosition, blockedRegion)) {
+            // If in blocked region, we don't insert detection
+            continue;
+          }
+        }
+
+        auto newTrack = Track(frameNumber);
         newTrack.centerPositions.push_back(detectionCenterPosition);
         tracks.push_back(newTrack);
-        detectionWasInserted = true;
       }
 
-      previousFrame = currentFrame;
+      // Update track parameters
+      for (auto& track : tracks) {
+        if (!track.newInsertion && track.endFrame == -1) {
+          track.gap += distanceToLastFrame;
+          if (track.gap > parameters.maxTrackGap) {
+            track.endFrame = frameNumber;
+          }
+        }
+        track.newInsertion = false;
+      }
+
+      previousFrame = frameNumber;
     }
 
     std::cout << "Number of tracks before deletion: " << tracks.size() << std::endl;
 
+    auto lastFrameEntry = *max_element(
+      this->detections.begin(), 
+      this->detections.end(),
+      [](const auto& l, const auto& r) { return l.first > r.first; }
+    );
     for (std::vector<Track>::iterator it = tracks.begin(); it!=tracks.end();) {
       // Set unfinished tracks' last frame to the last detection frame
       if (it->endFrame == -1) {
-        it->endFrame = this->detections.back().frameNumber;
+        it->endFrame = lastFrameEntry.first;
       }
 
       // Remove tracks not long enough (geometrically and temporally)
